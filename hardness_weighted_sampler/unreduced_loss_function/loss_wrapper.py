@@ -84,9 +84,3 @@ class UnreducedLossFunction(nn.Module):
             return self.loss_batch.sum()
         else:  # self.reduction == 'mean'
             return self.loss_batch.mean()
-
-    # def __getattr__(self, name):
-    #     return getattr(self.func, name)
-    #
-    # def __setstate__(self, data):
-    #     self.__dict__.update(data)

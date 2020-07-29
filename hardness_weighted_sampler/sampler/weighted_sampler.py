@@ -16,7 +16,7 @@ class WeightedSampler(Sampler):
     There is one weight per example in the dataset.
     The weights can be updated dynamically during training.
     """
-    def __init__(self, beta=100, weights_init=1, num_samples=-1):
+    def __init__(self, beta=100, weights_init=1, num_samples=-1, momentum=0.):
         """
         :param beta: float; robustness parameter (must be positive).
         It allows to interpolate between empirical risk minimization (beta=0),
@@ -31,6 +31,10 @@ class WeightedSampler(Sampler):
         self.num_samples = num_samples
         # Distributionally robustness parameter
         self.beta = beta
+
+        # Momentum used for the update of the loss history.
+        self.momentum = momentum
+
         # Initialization of the per-example loss values with a constant value
         if isinstance(weights_init, float) or isinstance(weights_init, int):
             assert num_samples > 0, \
@@ -80,13 +84,14 @@ class WeightedSampler(Sampler):
         return sample_list
 
     def get_importance_sampling_weights(self, batch_new_weights, batch_indices):
+        # Must be called before updating the weights
         assert len(batch_indices) == batch_new_weights.size()[0], "number of weights in " \
                                                                "input batch does not " \
                                                                "correspond to the number " \
                                                                "of indices."
         log_importance_weights = []
         for idx, new_weight in zip(batch_indices, batch_new_weights):
-            w = self.beta * (new_weight - self.weights[idx])
+            w = self.beta * (1. - self.momentum) * (new_weight - self.weights[idx])
             log_importance_weights.append(w)
         importance_weights = torch.tensor(
             log_importance_weights, requires_grad=False).exp().float()
@@ -99,7 +104,8 @@ class WeightedSampler(Sampler):
         :param new_weight: float; new weight value for idx.
         """
         # Modify this function for other update strategies.
-        self.weights[idx] = new_weight
+        self.weights[idx] = self.momentum * self.weights[idx] \
+                            + (1. - self.momentum) * new_weight
 
     def save_weights(self, save_path):
         torch.save(self.weights, save_path)
@@ -108,6 +114,7 @@ class WeightedSampler(Sampler):
         print('Load the sampling weights from %s' % weights_path)
         weights = torch.load(weights_path)
         self.weights = weights
+        self.num_samples = self.weights.size()[0]
 
     def hardest_samples_indices(self, num=100):
         """

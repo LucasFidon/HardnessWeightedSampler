@@ -27,6 +27,8 @@ class WeightedSampler(Sampler):
         of the loss function used. Its size should be equal to num_samples.
         :param num_samples: int; number of samples in the dataset.
         num_samples must be specified if weights_init is a constant value.
+        When weights_init is a 1d tensor, the number of samples is inferred
+        automatically from the size of weights_init.
         """
         self.num_samples = num_samples
         # Distributionally robustness parameter
@@ -46,6 +48,8 @@ class WeightedSampler(Sampler):
                 np.random.normal(loc=weights_init, scale=0.001*weights_init, size=num_samples))
         # Initialization with a given vector of per-example loss values
         else:
+            if isinstance(weights_init, np.ndarray):  # Support for numpy arrays
+                weights_init = torch.tensor(weights_init)
             assert len(weights_init.shape) == 1, "initial weights should be a 1d tensor"
             self.weights = weights_init.float()
             if self.num_samples <= 0:
